@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas Chain — Leave a Mark</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script>
+  const FIREBASE_CONFIG = {
+    apiKey:            "AIzaSyB1xjyLZVP7qydwwLOWIWzyRrF1b4uASIo",
+    authDomain:        "chain-letter-134b5.firebaseapp.com",
+    databaseURL:       "https://chain-letter-134b5-default-rtdb.firebaseio.com",
+    projectId:         "chain-letter-134b5",
+    storageBucket:     "chain-letter-134b5.firebasestorage.app",
+    messagingSenderId: "406934574423",
+    appId:             "1:406934574423:web:9a7b0ddce59bdee4399a12",
+    measurementId:     "G-J3205JSTP9"
+  };
+</script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f6f1ea;
+    --canvas-bg: #fffdf7;
+    --accent: #c0392b;
+    --accent2: #2c3e50;
+    --muted: #7f8c8d;
+    --border: #d4c9b0;
+    --shadow: rgba(26,26,46,0.12);
+  }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    max-width: 860px;
+    padding: 2.5rem 1.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+
+  .title-group h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.2rem;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .title-group p {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .visitor-badge {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 0.3rem 0.7rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  main {
+    width: 100%;
+    max-width: 860px;
+    padding: 0 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .canvas-section { display: flex; flex-direction: column; gap: 0.8rem; }
+
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .section-label::before { content:''; display:block; width:20px; height:1px; background:var(--muted); }
+  .section-label.yours { color: var(--accent2); }
+  .section-label.yours::before { background: var(--accent2); }
+
+  .canvas-wrapper {
+    position: relative;
+    background: var(--canvas-bg);
+    border: 1px solid var(--border);
+    box-shadow: 3px 3px 0 var(--shadow);
+  }
+
+  canvas { display: block; width: 100%; touch-action: none; }
+  canvas.readonly { cursor: default; pointer-events: none; }
+  #my-canvas { cursor: crosshair; }
+
+  .empty-state {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0.5rem;
+    pointer-events: none;
+  }
+  .empty-glyph { font-family:'DM Serif Display',serif; font-size:4rem; opacity:0.06; }
+  .empty-text { font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); opacity:0.5; }
+
+  .toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+
+  .color-swatch {
+    width: 20px; height: 20px;
+    border: 1.5px solid transparent;
+    cursor: pointer; transition: transform 0.1s; flex-shrink: 0;
+  }
+------------------------------------------------
+
+
+----------------------------------------------------------
+  .color-swatch:hover { transform: scale(1.2); }
+  .color-swatch.active { border-color: var(--ink); transform: scale(1.15); }
+
+  .size-btn {
+    background: none; border: 1px solid var(--border); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px;
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--ink);
+    transition: background 0.15s;
+  }
+  .size-btn:hover { background: var(--border); }
+  .size-btn.active { background: var(--ink); color: var(--paper); }
+
+  .divider { width:1px; height:20px; background:var(--border); margin:0 0.2rem; }
+
+  .tool-btn {
+    background: none; border: 1px solid var(--border); cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    font-family: 'DM Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
+    transition: background 0.15s;
+  }
+  .tool-btn:hover { background: var(--border); }
+  .tool-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .spacer { flex: 1; }
+
+  .submit-btn {
+    background: var(--accent); color: #fff;
+    border: none; padding: 0.6rem 1.4rem;
+    font-family: 'DM Mono', monospace; font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    box-shadow: 2px 2px 0 rgba(192,57,43,0.3);
+  }
+  .submit-btn:hover { opacity: 0.88; }
+  .submit-btn:active { transform: translate(1px,1px); }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .divider-line {
+    width: 100%; display: flex; align-items: center; gap: 1rem;
+    color: var(--muted); font-size: 0.65rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .divider-line::before, .divider-line::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  .status-bar {
+    font-size: 0.65rem; letter-spacing: 0.08em;
+    color: var(--muted); text-align: right; min-height: 1.2rem;
+  }
+  .status-bar.saving { color: var(--accent2); }
+  .status-bar.saved  { color: #27ae60; }
+  .status-bar.error  { color: var(--accent); }
+
+  #loading-overlay {
+    position: fixed; inset: 0; background: var(--paper);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1.5rem;
+    z-index: 1000; transition: opacity 0.5s;
+  }
+  #loading-overlay h2 { font-family:'DM Serif Display',serif; font-size:1.8rem; }
+  #loading-overlay p { font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); text-align:center; max-width:300px; }
+
+  .dot-anim { display:inline-flex; gap:6px; }
+  .dot-anim span {
+    width:6px; height:6px; background:var(--ink);
+    border-radius:50%; animation: blink 1.2s infinite;
+  }
+  .dot-anim span:nth-child(2) { animation-delay:0.2s; }
+  .dot-anim span:nth-child(3) { animation-delay:0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.15} 40%{opacity:1} }
+
+  .submitted-msg {
+    text-align: center; padding: 2rem;
+    border: 1px solid var(--border); background: var(--canvas-bg);
+  }
+  .submitted-msg h3 { font-family:'DM Serif Display',serif; font-size:1.5rem; margin-bottom:0.5rem; }
+  .submitted-msg p { font-size:0.72rem; color:var(--muted); letter-spacing:0.05em; line-height:1.8; }
+
+  @media (max-width:600px) {
+    .title-group h1 { font-size:1.6rem; }
+    header { flex-direction:column; align-items:flex-start; gap:1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <h2>Canvas Chain</h2>
+  <div class="dot-anim"><span></span><span></span><span></span></div>
+  <p id="loading-msg">Connecting to database…</p>
+</div>
+
+<header>
+  <div class="title-group">
+    <h1>Canvas Chain</h1>
+    <p>A drawing passed from stranger to stranger</p>
+  </div>
+  <div class="visitor-badge" id="visitor-num">Visitor #—</div>
+</header>
+
+<main>
+  <div class="canvas-section">
+    <div class="section-label">what the previous visitor left for you</div>
+    <div class="canvas-wrapper">
+      <canvas id="prev-canvas" class="readonly" height="340"></canvas>
+      <div class="empty-state" id="prev-empty">
+        <div class="empty-glyph">∅</div>
+        <div class="empty-text">You are the first visitor</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider-line">your turn</div>
+
+  <div class="canvas-section" id="my-section">
+    <div class="section-label yours">draw or write something for the next visitor</div>
+    <div class="canvas-wrapper">
+      <canvas id="my-canvas" height="340"></canvas>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <div class="color-swatch active" style="background:#1a1a2e" data-color="#1a1a2e"></div>
+      <div class="color-swatch" style="background:#c0392b" data-color="#c0392b"></div>
+      <div class="color-swatch" style="background:#2980b9" data-color="#2980b9"></div>
+      <div class="color-swatch" style="background:#27ae60" data-color="#27ae60"></div>
+      <div class="color-swatch" style="background:#f39c12" data-color="#f39c12"></div>
+      <div class="color-swatch" style="background:#8e44ad" data-color="#8e44ad"></div>
+      <div class="color-swatch" style="background:#e8e0d0;border:1px solid #d4c9b0" data-color="#fffdf7"></div>
+      <div class="divider"></div>
+      <button class="size-btn active" data-size="2">S</button>
+      <button class="size-btn" data-size="5">M</button>
+      <button class="size-btn" data-size="12">L</button>
+      <div class="divider"></div>
+      <button class="tool-btn active" id="pen-btn">Pen</button>
+      <button class="tool-btn" id="text-btn">Text</button>
+      <button class="tool-btn" id="clear-btn">Clear</button>
+      <div class="spacer"></div>
+      <button class="submit-btn" id="submit-btn" disabled>Pass it on →</button>
+    </div>
+    <div class="status-bar" id="status"></div>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+
+const prevCanvas = document.getElementById('prev-canvas');
+const prevCtx    = prevCanvas.getContext('2d');
+const myCanvas   = document.getElementById('my-canvas');
+const myCtx      = myCanvas.getContext('2d');
+const submitBtn  = document.getElementById('submit-btn');
+const statusEl   = document.getElementById('status');
+const prevEmpty  = document.getElementById('prev-empty');
+const overlay    = document.getElementById('loading-overlay');
+const visitorNum = document.getElementById('visitor-num');
+const loadingMsg = document.getElementById('loading-msg');
+
+const DPR = window.devicePixelRatio || 1;
+
+function initCanvas(canvas) {
+  const w = canvas.parentElement.clientWidth;
+  canvas.width  = w * DPR;
+  canvas.height = 340 * DPR;
+  canvas.style.width  = w + 'px';
+  canvas.style.height = '340px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  ctx.fillStyle = '#fffdf7';
+  ctx.fillRect(0, 0, w, 340);
+}
+
+function cW(c) { return c.width / DPR; }
+function cH(c) { return c.height / DPR; }
+
+let visitorNumber = 1;
+let submitted    = false;
+let drawingMode  = 'pen';
+let currentColor = '#1a1a2e';
+let currentSize  = 2;
+let hasDrawn     = false;
+
+async function loadChain() {
+  loadingMsg.textContent = "Retrieving the previous visitor's canvas…";
+  try {
+    const snap = await db.ref('chain').get();
+    if (snap.exists()) {
+      const data = snap.val();
+      visitorNumber = (data.visitorCount || 0) + 1;
+      if (data.latestCanvas) renderPrevious(data.latestCanvas);
+    }
+    visitorNum.textContent = 'Visitor #' + visitorNumber;
+    hideOverlay();
+  } catch (err) {
+    console.error(err);
+    loadingMsg.textContent = 'Database error: ' + err.message + ' — Check Firebase Rules.';
+    setTimeout(hideOverlay, 5000);
+  }
+}
+
+function hideOverlay() {
+  overlay.style.opacity = '0';
+  setTimeout(() => overlay.style.display = 'none', 500);
+}
+
+function renderPrevious(dataURL) {
+  prevEmpty.style.display = 'none';
+  const img = new Image();
+  img.onload = () => {
+    prevCtx.clearRect(0, 0, cW(prevCanvas), cH(prevCanvas));
+    prevCtx.drawImage(img, 0, 0, cW(prevCanvas), cH(prevCanvas));
+  };
+  img.src = dataURL;
+}
+
+async function saveChain(dataURL) {
+  await db.ref('chain').set({
+    visitorCount: visitorNumber,
+    latestCanvas: dataURL,
+    updatedAt:    Date.now()
+  });
+}
+
+// ── Drawing ───────────────────────────────────────────────────
+let isDrawing = false, lastX = 0, lastY = 0;
+
+function getPos(e, canvas) {
+  const rect  = canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+myCanvas.addEventListener('mousedown',  startDraw);
+myCanvas.addEventListener('mousemove',  draw);
+myCanvas.addEventListener('mouseup',    stopDraw);
+myCanvas.addEventListener('mouseleave', stopDraw);
+myCanvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e); }, { passive: false });
+myCanvas.addEventListener('touchmove',  e => { e.preventDefault(); draw(e); },      { passive: false });
+myCanvas.addEventListener('touchend',   stopDraw);
+
+function startDraw(e) {
+  if (submitted || drawingMode === 'text') return;
+  isDrawing = true;
+  const { x, y } = getPos(e, myCanvas);
+  lastX = x; lastY = y;
+  myCtx.beginPath();
+  myCtx.arc(x, y, currentSize / 2, 0, Math.PI * 2);
+  myCtx.fillStyle = currentColor;
+  myCtx.fill();
+  markDrawn();
+}
+
+function draw(e) {
+  if (!isDrawing || submitted || drawingMode === 'text') return;
+  const { x, y } = getPos(e, myCanvas);
+  myCtx.beginPath();
+  myCtx.moveTo(lastX, lastY);
+  myCtx.lineTo(x, y);
+  myCtx.strokeStyle = currentColor;
+  myCtx.lineWidth   = currentSize;
+  myCtx.lineCap     = 'round';
+  myCtx.lineJoin    = 'round';
+  myCtx.stroke();
+  lastX = x; lastY = y;
+  markDrawn();
+}
+
+function stopDraw() { isDrawing = false; }
+function markDrawn() {
+  if (!hasDrawn) { hasDrawn = true; submitBtn.disabled = false; }
+}
+
+myCanvas.addEventListener('click', e => {
+  if (drawingMode !== 'text' || submitted) return;
+  const { x, y } = getPos(e, myCanvas);
+  const text = prompt('Type something:');
+  if (!text) return;
+  myCtx.font      = `${Math.max(currentSize * 6, 16)}px 'DM Mono', monospace`;
+  myCtx.fillStyle = currentColor;
+  myCtx.fillText(text, x, y);
+  markDrawn();
+});
+
+// ── Toolbar ───────────────────────────────────────────────────
+document.querySelectorAll('.color-swatch').forEach(s => {
+  s.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    currentColor = s.dataset.color;
+  });
+});
+
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSize = parseInt(btn.dataset.size);
+  });
+});
+
+document.getElementById('pen-btn').addEventListener('click', () => {
+  drawingMode = 'pen';
+  myCanvas.style.cursor = 'crosshair';
+  document.getElementById('pen-btn').classList.add('active');
+  document.getElementById('text-btn').classList.remove('active');
+});
+
+document.getElementById('text-btn').addEventListener('click', () => {
+  drawingMode = 'text';
+  myCanvas.style.cursor = 'text';
+  document.getElementById('text-btn').classList.add('active');
+  document.getElementById('pen-btn').classList.remove('active');
+});
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  if (submitted) return;
+  myCtx.fillStyle = '#fffdf7';
+  myCtx.fillRect(0, 0, cW(myCanvas), cH(myCanvas));
+  hasDrawn = false;
+  submitBtn.disabled = true;
+});
+
+// ── Submit ────────────────────────────────────────────────────
+submitBtn.addEventListener('click', async () => {
+  if (submitted) return;
+  submitted = true;
+  submitBtn.disabled = true;
+  document.getElementById('toolbar').style.pointerEvents = 'none';
+  myCanvas.style.cursor = 'default';
+  setStatus('saving', 'Passing your canvas to the chain…');
+
+  try {
+    const dataURL = myCanvas.toDataURL('image/png');
+    await saveChain(dataURL);
+    setStatus('saved', 'Saved ✓ — the next visitor will see your work.');
+    showDoneMessage();
+  } catch (err) {
+    console.error(err);
+    submitted = false;
+    submitBtn.disabled = false;
+    document.getElementById('toolbar').style.pointerEvents = '';
+    myCanvas.style.cursor = 'crosshair';
+    setStatus('error', 'Save failed: ' + err.message);
+  }
+});
+
+function setStatus(cls, msg) {
+  statusEl.className = 'status-bar ' + cls;
+  statusEl.textContent = msg;
+}
+
+function showDoneMessage() {
+  const section = document.getElementById('my-section');
+  const msg = document.createElement('div');
+  msg.className = 'submitted-msg';
+  msg.innerHTML = `
+    <h3>Passed on.</h3>
+    <p>Your canvas has been saved to the chain.<br>
+    The next stranger who visits will see what you drew.<br>
+    They'll add their own layer — and pass it forward.</p>
+  `;
+  section.appendChild(msg);
+}
+
+// ── Resize ────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  [myCanvas, prevCanvas].forEach(canvas => {
+    const snap = canvas.toDataURL();
+    initCanvas(canvas);
+    const img = new Image();
+    img.onload = () => canvas.getContext('2d').drawImage(img, 0, 0, cW(canvas), cH(canvas));
+    img.src = snap;
+  });
+});
+
+// ── Start ─────────────────────────────────────────────────────
+initCanvas(prevCanvas);
+initCanvas(myCanvas);
+loadChain();
+</script>
+
+</body>
+</html>
