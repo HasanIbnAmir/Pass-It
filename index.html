@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Canvas Chain — Leave a Mark</title>
+<title>Passit</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <script>
@@ -23,14 +23,14 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --ink: #1a1a2e;
-    --paper: #f6f1ea;
+    --ink:       #1a1a2e;
+    --paper:     #f5f0e8;
     --canvas-bg: #fffdf7;
-    --accent: #c0392b;
-    --accent2: #2c3e50;
-    --muted: #7f8c8d;
-    --border: #d4c9b0;
-    --shadow: rgba(26,26,46,0.12);
+    --accent:    #c0392b;
+    --accent2:   #2c3e50;
+    --muted:     #7f8c8d;
+    --border:    #d4c9b0;
+    --shadow:    rgba(26,26,46,0.12);
   }
 
   body {
@@ -99,18 +99,37 @@
     text-transform: uppercase;
     color: var(--muted);
   }
-  .section-label::before { content:''; display:block; width:20px; height:1px; background:var(--muted); }
+  .section-label::before {
+    content: '';
+    display: block;
+    width: 20px;
+    height: 1px;
+    background: var(--muted);
+  }
   .section-label.yours { color: var(--accent2); }
   .section-label.yours::before { background: var(--accent2); }
 
+  /* Canvas wrapper — fixed aspect ratio so it looks same on all devices */
   .canvas-wrapper {
     position: relative;
     background: var(--canvas-bg);
     border: 1px solid var(--border);
     box-shadow: 3px 3px 0 var(--shadow);
+    /* 16:7 aspect ratio — consistent across all screen sizes */
+    width: 100%;
+    padding-bottom: 43.75%; /* 7/16 = 0.4375 */
+    height: 0;
   }
 
-  canvas { display: block; width: 100%; touch-action: none; }
+  .canvas-wrapper canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    touch-action: none;
+  }
+
   canvas.readonly { cursor: default; pointer-events: none; }
   #my-canvas { cursor: crosshair; }
 
@@ -120,26 +139,55 @@
     align-items: center; justify-content: center; gap: 0.5rem;
     pointer-events: none;
   }
-  .empty-glyph { font-family:'DM Serif Display',serif; font-size:4rem; opacity:0.06; }
-  .empty-text { font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); opacity:0.5; }
-
-  .toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-
-  .color-swatch {
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    border: 1.5px solid transparent;
-    cursor: pointer; transition: transform 0.1s; flex-shrink: 0;
+  .empty-glyph {
+    font-family: 'DM Serif Display', serif;
+    font-size: 4rem; opacity: 0.06; line-height: 1;
   }
-------------------------------------------------
+  .empty-text {
+    font-size: 0.7rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--muted); opacity: 0.5;
+  }
 
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
 
-----------------------------------------------------------
-  .color-swatch:hover { transform: scale(1.2); }
-  .color-swatch.active { border-color: var(--ink); transform: scale(1.15); }
+  /* Circular color swatches */
+  .color-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.12s;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    position: relative;
+  }
+  .color-swatch:hover { transform: scale(1.18); }
+  .color-swatch.active::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+  }
+  /* Eraser swatch — white with border */
+  .color-swatch.eraser {
+    background: var(--canvas-bg);
+    box-shadow: 0 0 0 1.5px var(--border), 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .color-swatch.eraser.active::after { border-color: var(--muted); }
+
+  .divider { width: 1px; height: 20px; background: var(--border); margin: 0 0.2rem; }
 
   .size-btn {
-    background: none; border: 1px solid var(--border); cursor: pointer;
+    background: none;
+    border: 1px solid var(--border);
+    cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     width: 28px; height: 28px;
     font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--ink);
@@ -148,17 +196,18 @@
   .size-btn:hover { background: var(--border); }
   .size-btn.active { background: var(--ink); color: var(--paper); }
 
-  .divider { width:1px; height:20px; background:var(--border); margin:0 0.2rem; }
-
   .tool-btn {
-    background: none; border: 1px solid var(--border); cursor: pointer;
+    background: none;
+    border: 1px solid var(--border);
+    cursor: pointer;
     padding: 0.3rem 0.6rem;
     font-family: 'DM Mono', monospace; font-size: 0.65rem;
     letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
     transition: background 0.15s;
+    display: flex; align-items: center; gap: 5px;
   }
   .tool-btn:hover { background: var(--border); }
-  .tool-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .tool-btn svg { width: 12px; height: 12px; }
 
   .spacer { flex: 1; }
 
@@ -171,7 +220,7 @@
     box-shadow: 2px 2px 0 rgba(192,57,43,0.3);
   }
   .submit-btn:hover { opacity: 0.88; }
-  .submit-btn:active { transform: translate(1px,1px); }
+  .submit-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 rgba(192,57,43,0.3); }
   .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
   .divider-line {
@@ -179,7 +228,7 @@
     color: var(--muted); font-size: 0.65rem;
     letter-spacing: 0.1em; text-transform: uppercase;
   }
-  .divider-line::before, .divider-line::after { content:''; flex:1; height:1px; background:var(--border); }
+  .divider-line::before, .divider-line::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
   .status-bar {
     font-size: 0.65rem; letter-spacing: 0.08em;
@@ -189,34 +238,36 @@
   .status-bar.saved  { color: #27ae60; }
   .status-bar.error  { color: var(--accent); }
 
+  /* Loading overlay */
   #loading-overlay {
     position: fixed; inset: 0; background: var(--paper);
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 1.5rem;
     z-index: 1000; transition: opacity 0.5s;
   }
-  #loading-overlay h2 { font-family:'DM Serif Display',serif; font-size:1.8rem; }
-  #loading-overlay p { font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); text-align:center; max-width:300px; }
-
-  .dot-anim { display:inline-flex; gap:6px; }
+  #loading-overlay h2 { font-family: 'DM Serif Display', serif; font-size: 1.8rem; }
+  #loading-overlay p { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .dot-anim { display: inline-flex; gap: 6px; }
   .dot-anim span {
-    width:6px; height:6px; background:var(--ink);
-    border-radius:50%; animation: blink 1.2s infinite;
+    width: 6px; height: 6px; background: var(--ink);
+    border-radius: 50%; animation: blink 1.2s infinite;
   }
-  .dot-anim span:nth-child(2) { animation-delay:0.2s; }
-  .dot-anim span:nth-child(3) { animation-delay:0.4s; }
+  .dot-anim span:nth-child(2) { animation-delay: 0.2s; }
+  .dot-anim span:nth-child(3) { animation-delay: 0.4s; }
   @keyframes blink { 0%,80%,100%{opacity:0.15} 40%{opacity:1} }
 
+  /* Done message */
   .submitted-msg {
     text-align: center; padding: 2rem;
     border: 1px solid var(--border); background: var(--canvas-bg);
   }
-  .submitted-msg h3 { font-family:'DM Serif Display',serif; font-size:1.5rem; margin-bottom:0.5rem; }
-  .submitted-msg p { font-size:0.72rem; color:var(--muted); letter-spacing:0.05em; line-height:1.8; }
+  .submitted-msg h3 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .submitted-msg p { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; line-height: 1.8; }
 
-  @media (max-width:600px) {
-    .title-group h1 { font-size:1.6rem; }
-    header { flex-direction:column; align-items:flex-start; gap:1rem; }
+  @media (max-width: 600px) {
+    .title-group h1 { font-size: 1.6rem; }
+    header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .toolbar { gap: 0.4rem; }
   }
 </style>
 </head>
@@ -225,7 +276,7 @@
 <div id="loading-overlay">
   <h2>Canvas Chain</h2>
   <div class="dot-anim"><span></span><span></span><span></span></div>
-  <p id="loading-msg">Connecting to database…</p>
+  <p id="loading-msg">Retrieving the previous visitor's canvas…</p>
 </div>
 
 <header>
@@ -237,10 +288,12 @@
 </header>
 
 <main>
+
+  <!-- Previous canvas -->
   <div class="canvas-section">
     <div class="section-label">what the previous visitor left for you</div>
-    <div class="canvas-wrapper">
-      <canvas id="prev-canvas" class="readonly" height="340"></canvas>
+    <div class="canvas-wrapper" id="prev-wrapper">
+      <canvas id="prev-canvas" class="readonly"></canvas>
       <div class="empty-state" id="prev-empty">
         <div class="empty-glyph">∅</div>
         <div class="empty-text">You are the first visitor</div>
@@ -250,33 +303,57 @@
 
   <div class="divider-line">your turn</div>
 
+  <!-- Your canvas -->
   <div class="canvas-section" id="my-section">
-    <div class="section-label yours">draw or write something for the next visitor</div>
-    <div class="canvas-wrapper">
-      <canvas id="my-canvas" height="340"></canvas>
+    <div class="section-label yours">draw something for the next visitor</div>
+    <div class="canvas-wrapper" id="my-wrapper">
+      <canvas id="my-canvas"></canvas>
     </div>
 
     <div class="toolbar" id="toolbar">
-      <div class="color-swatch active" style="background:#1a1a2e" data-color="#1a1a2e"></div>
-      <div class="color-swatch" style="background:#c0392b" data-color="#c0392b"></div>
-      <div class="color-swatch" style="background:#2980b9" data-color="#2980b9"></div>
-      <div class="color-swatch" style="background:#27ae60" data-color="#27ae60"></div>
-      <div class="color-swatch" style="background:#f39c12" data-color="#f39c12"></div>
-      <div class="color-swatch" style="background:#8e44ad" data-color="#8e44ad"></div>
-      <div class="color-swatch" style="background:#e8e0d0;border:1px solid #d4c9b0" data-color="#fffdf7"></div>
+
+      <!-- Circular color swatches -->
+      <div class="color-swatch active" style="background:#1a1a2e" data-color="#1a1a2e" title="Black"></div>
+      <div class="color-swatch" style="background:#c0392b" data-color="#c0392b" title="Red"></div>
+      <div class="color-swatch" style="background:#2980b9" data-color="#2980b9" title="Blue"></div>
+      <div class="color-swatch" style="background:#27ae60" data-color="#27ae60" title="Green"></div>
+      <div class="color-swatch" style="background:#f39c12" data-color="#f39c12" title="Amber"></div>
+      <div class="color-swatch" style="background:#8e44ad" data-color="#8e44ad" title="Purple"></div>
+      <div class="color-swatch eraser" data-color="ERASER" title="Eraser"></div>
+
       <div class="divider"></div>
+
+      <!-- Brush sizes -->
       <button class="size-btn active" data-size="2">S</button>
-      <button class="size-btn" data-size="5">M</button>
-      <button class="size-btn" data-size="12">L</button>
+      <button class="size-btn" data-size="6">M</button>
+      <button class="size-btn" data-size="14">L</button>
+
       <div class="divider"></div>
-      <button class="tool-btn active" id="pen-btn">Pen</button>
-      <!-- <button class="tool-btn" id="text-btn">Text</button> -->
-      <button class="tool-btn" id="clear-btn">Clear</button>
+
+      <!-- Undo -->
+      <button class="tool-btn" id="undo-btn" title="Undo (Ctrl+Z)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+        </svg>
+        Undo
+      </button>
+
+      <!-- Clear -->
+      <button class="tool-btn" id="clear-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+        Clear
+      </button>
+
       <div class="spacer"></div>
+
       <button class="submit-btn" id="submit-btn" disabled>Pass it on →</button>
     </div>
+
     <div class="status-bar" id="status"></div>
   </div>
+
 </main>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -286,6 +363,7 @@
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 
+// ── Elements ──────────────────────────────────────────────────
 const prevCanvas = document.getElementById('prev-canvas');
 const prevCtx    = prevCanvas.getContext('2d');
 const myCanvas   = document.getElementById('my-canvas');
@@ -297,82 +375,68 @@ const overlay    = document.getElementById('loading-overlay');
 const visitorNum = document.getElementById('visitor-num');
 const loadingMsg = document.getElementById('loading-msg');
 
-const DPR = window.devicePixelRatio || 1;
-
-// Fixed internal canvas size
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 340;
+// ── Canvas size constants ─────────────────────────────────────
+// We store drawings at a fixed internal resolution.
+// This means phone drawings look correct on desktop and vice versa.
+const CANVAS_W = 1200;
+const CANVAS_H = 525; // 16:7 ratio = 1200 * 7/16
 
 function initCanvas(canvas) {
-  canvas.width = CANVAS_WIDTH * DPR;
-  canvas.height = CANVAS_HEIGHT * DPR;
-
-  // responsive display size
-  canvas.style.width = "100%";
-  canvas.style.height = "340px";
-
+  canvas.width  = CANVAS_W;
+  canvas.height = CANVAS_H;
+  // CSS size is set by the wrapper's padding-bottom trick (100% x 43.75%)
   const ctx = canvas.getContext('2d');
-
-  // reset transform before scaling
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.scale(DPR, DPR);
-
   ctx.fillStyle = '#fffdf7';
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 }
 
-function cW() { return CANVAS_WIDTH; }
-function cH() { return CANVAS_HEIGHT; }
-
+// ── State ─────────────────────────────────────────────────────
 let visitorNumber = 1;
-let submitted = false;
+let submitted    = false;
 let currentColor = '#1a1a2e';
-let currentSize = 2;
-let hasDrawn = false;
+let currentSize  = 2;
+let hasDrawn     = false;
 
-// ───────────────── Firebase Load ─────────────────
+// Undo history — array of ImageData snapshots
+const undoStack = [];
+const MAX_UNDO  = 40;
+
+function saveSnapshot() {
+  undoStack.push(myCtx.getImageData(0, 0, CANVAS_W, CANVAS_H));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+// ── Firebase ──────────────────────────────────────────────────
 async function loadChain() {
   loadingMsg.textContent = "Retrieving the previous visitor's canvas…";
-
   try {
     const snap = await db.ref('chain').get();
-
     if (snap.exists()) {
       const data = snap.val();
       visitorNumber = (data.visitorCount || 0) + 1;
-
-      if (data.latestCanvas) {
-        renderPrevious(data.latestCanvas);
-      }
+      if (data.latestCanvas) renderPrevious(data.latestCanvas);
     }
-
     visitorNum.textContent = 'Visitor #' + visitorNumber;
     hideOverlay();
-
   } catch (err) {
-    console.error("Firebase error:", err);
-    loadingMsg.textContent = 'Database error: ' + err.message;
-    setTimeout(hideOverlay, 3000);
+    loadingMsg.textContent = 'Error: ' + err.message;
+    setTimeout(hideOverlay, 5000);
   }
 }
 
 function hideOverlay() {
   overlay.style.opacity = '0';
-  setTimeout(() => {
-    overlay.style.display = 'none';
-  }, 500);
+  setTimeout(() => overlay.style.display = 'none', 500);
 }
 
 function renderPrevious(dataURL) {
   prevEmpty.style.display = 'none';
-
   const img = new Image();
-
   img.onload = () => {
-    prevCtx.clearRect(0, 0, cW(), cH());
-    prevCtx.drawImage(img, 0, 0, cW(), cH());
+    // Always draw into fixed CANVAS_W × CANVAS_H — no distortion
+    prevCtx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    prevCtx.drawImage(img, 0, 0, CANVAS_W, CANVAS_H);
   };
-
   img.src = dataURL;
 }
 
@@ -380,159 +444,144 @@ async function saveChain(dataURL) {
   await db.ref('chain').set({
     visitorCount: visitorNumber,
     latestCanvas: dataURL,
-    updatedAt: Date.now()
+    updatedAt:    Date.now()
   });
 }
 
-// ───────────────── Drawing Logic ─────────────────
-let isDrawing = false;
-let lastX = 0;
-let lastY = 0;
+// ── Drawing ───────────────────────────────────────────────────
+let isDrawing = false, lastX = 0, lastY = 0;
 
+// Convert mouse/touch position (CSS pixels) → canvas pixels
 function getPos(e, canvas) {
-  const rect = canvas.getBoundingClientRect();
-  const touch = e.touches ? e.touches[0] : e;
+  const rect   = canvas.getBoundingClientRect();
+  const src    = e.touches ? e.touches[0] : e;
+  const cssX   = src.clientX - rect.left;
+  const cssY   = src.clientY - rect.top;
+  // Scale from CSS size to internal canvas size
+  const scaleX = CANVAS_W / rect.width;
+  const scaleY = CANVAS_H / rect.height;
+  return { x: cssX * scaleX, y: cssY * scaleY };
+}
 
-  return {
-    x: ((touch.clientX - rect.left) / rect.width) * CANVAS_WIDTH,
-    y: ((touch.clientY - rect.top) / rect.height) * CANVAS_HEIGHT
-  };
+// Scale brush size so it looks proportional on all screen sizes
+function scaledSize() {
+  const rect = myCanvas.getBoundingClientRect();
+  return currentSize * (CANVAS_W / rect.width);
+}
+
+myCanvas.addEventListener('mousedown',  startDraw);
+myCanvas.addEventListener('mousemove',  draw);
+myCanvas.addEventListener('mouseup',    stopDraw);
+myCanvas.addEventListener('mouseleave', stopDraw);
+myCanvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e); }, { passive: false });
+myCanvas.addEventListener('touchmove',  e => { e.preventDefault(); draw(e); },      { passive: false });
+myCanvas.addEventListener('touchend',   stopDraw);
+
+function getDrawColor() {
+  return currentColor === 'ERASER' ? '#fffdf7' : currentColor;
 }
 
 function startDraw(e) {
   if (submitted) return;
-
+  saveSnapshot(); // snapshot before each stroke for undo
   isDrawing = true;
-
   const { x, y } = getPos(e, myCanvas);
-
-  lastX = x;
-  lastY = y;
-
+  lastX = x; lastY = y;
+  const sz = scaledSize();
   myCtx.beginPath();
-  myCtx.arc(x, y, currentSize / 2, 0, Math.PI * 2);
-  myCtx.fillStyle = currentColor;
+  myCtx.arc(x, y, sz / 2, 0, Math.PI * 2);
+  myCtx.fillStyle = getDrawColor();
   myCtx.fill();
-
   markDrawn();
 }
 
 function draw(e) {
   if (!isDrawing || submitted) return;
-
   const { x, y } = getPos(e, myCanvas);
-
+  const sz = scaledSize();
   myCtx.beginPath();
   myCtx.moveTo(lastX, lastY);
   myCtx.lineTo(x, y);
-
-  myCtx.strokeStyle = currentColor;
-  myCtx.lineWidth = currentSize;
-  myCtx.lineCap = 'round';
-  myCtx.lineJoin = 'round';
-
+  myCtx.strokeStyle = getDrawColor();
+  myCtx.lineWidth   = sz;
+  myCtx.lineCap     = 'round';
+  myCtx.lineJoin    = 'round';
   myCtx.stroke();
-
-  lastX = x;
-  lastY = y;
-
-  markDrawn();
+  lastX = x; lastY = y;
 }
 
-function stopDraw() {
-  isDrawing = false;
-}
+function stopDraw() { isDrawing = false; }
 
 function markDrawn() {
-  if (!hasDrawn) {
-    hasDrawn = true;
-    submitBtn.disabled = false;
+  if (!hasDrawn) { hasDrawn = true; submitBtn.disabled = false; }
+}
+
+// ── Undo ──────────────────────────────────────────────────────
+document.getElementById('undo-btn').addEventListener('click', undo);
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+});
+
+function undo() {
+  if (submitted || undoStack.length === 0) return;
+  const snap = undoStack.pop();
+  myCtx.putImageData(snap, 0, 0);
+  if (undoStack.length === 0) {
+    hasDrawn = false;
+    submitBtn.disabled = true;
   }
 }
 
-// Mouse events
-myCanvas.addEventListener('mousedown', startDraw);
-myCanvas.addEventListener('mousemove', draw);
-myCanvas.addEventListener('mouseup', stopDraw);
-myCanvas.addEventListener('mouseleave', stopDraw);
+// ── Clear ─────────────────────────────────────────────────────
+document.getElementById('clear-btn').addEventListener('click', () => {
+  if (submitted) return;
+  saveSnapshot();
+  myCtx.fillStyle = '#fffdf7';
+  myCtx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  hasDrawn = false;
+  submitBtn.disabled = true;
+});
 
-// Touch events
-myCanvas.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  startDraw(e);
-}, { passive: false });
-
-myCanvas.addEventListener('touchmove', (e) => {
-  e.preventDefault();
-  draw(e);
-}, { passive: false });
-
-myCanvas.addEventListener('touchend', stopDraw);
-
-// ───────────────── Toolbar ─────────────────
-document.querySelectorAll('.color-swatch').forEach((swatch) => {
-  swatch.addEventListener('click', () => {
-    document.querySelectorAll('.color-swatch')
-      .forEach(s => s.classList.remove('active'));
-
-    swatch.classList.add('active');
-    currentColor = swatch.dataset.color;
+// ── Colors ────────────────────────────────────────────────────
+document.querySelectorAll('.color-swatch').forEach(s => {
+  s.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    currentColor = s.dataset.color;
+    // Switch cursor
+    myCanvas.style.cursor = currentColor === 'ERASER' ? 'cell' : 'crosshair';
   });
 });
 
-document.querySelectorAll('.size-btn').forEach((btn) => {
+// ── Brush sizes ───────────────────────────────────────────────
+document.querySelectorAll('.size-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.size-btn')
-      .forEach(b => b.classList.remove('active'));
-
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentSize = parseInt(btn.dataset.size);
   });
 });
 
-document.getElementById('pen-btn').addEventListener('click', () => {
-  myCanvas.style.cursor = 'crosshair';
-});
-
-document.getElementById('clear-btn').addEventListener('click', () => {
-  if (submitted) return;
-
-  myCtx.fillStyle = '#fffdf7';
-  myCtx.fillRect(0, 0, cW(), cH());
-
-  hasDrawn = false;
-  submitBtn.disabled = true;
-});
-
-// ───────────────── Submit ─────────────────
+// ── Submit ────────────────────────────────────────────────────
 submitBtn.addEventListener('click', async () => {
   if (submitted) return;
-
   submitted = true;
   submitBtn.disabled = true;
-
   document.getElementById('toolbar').style.pointerEvents = 'none';
   myCanvas.style.cursor = 'default';
-
   setStatus('saving', 'Passing your canvas to the chain…');
 
   try {
+    // Export at internal resolution — always CANVAS_W × CANVAS_H
     const dataURL = myCanvas.toDataURL('image/png');
-
     await saveChain(dataURL);
-
     setStatus('saved', 'Saved ✓ — the next visitor will see your work.');
-    showDoneMessage();
-
+    showDone();
   } catch (err) {
-    console.error(err);
-
     submitted = false;
     submitBtn.disabled = false;
-
     document.getElementById('toolbar').style.pointerEvents = '';
     myCanvas.style.cursor = 'crosshair';
-
     setStatus('error', 'Save failed: ' + err.message);
   }
 });
@@ -542,23 +591,20 @@ function setStatus(cls, msg) {
   statusEl.textContent = msg;
 }
 
-function showDoneMessage() {
+function showDone() {
   const section = document.getElementById('my-section');
-
   const msg = document.createElement('div');
   msg.className = 'submitted-msg';
-
   msg.innerHTML = `
     <h3>Passed on.</h3>
     <p>Your canvas has been saved to the chain.<br>
     The next stranger who visits will see what you drew.<br>
-    They'll add their own layer — and pass it forward.</p>
+    They'll add their own mark — and pass it forward.</p>
   `;
-
   section.appendChild(msg);
 }
 
-// ───────────────── Start ─────────────────
+// ── Init ──────────────────────────────────────────────────────
 initCanvas(prevCanvas);
 initCanvas(myCanvas);
 loadChain();
