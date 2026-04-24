@@ -299,58 +299,80 @@ const loadingMsg = document.getElementById('loading-msg');
 
 const DPR = window.devicePixelRatio || 1;
 
+// Fixed internal canvas size
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 340;
+
 function initCanvas(canvas) {
-  const w = canvas.parentElement.clientWidth;
-  canvas.width  = w * DPR;
-  canvas.height = 340 * DPR;
-  canvas.style.width  = w + 'px';
-  canvas.style.height = '340px';
+  canvas.width = CANVAS_WIDTH * DPR;
+  canvas.height = CANVAS_HEIGHT * DPR;
+
+  // responsive display size
+  canvas.style.width = "100%";
+  canvas.style.height = "340px";
+
   const ctx = canvas.getContext('2d');
+
+  // reset transform before scaling
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(DPR, DPR);
+
   ctx.fillStyle = '#fffdf7';
-  ctx.fillRect(0, 0, w, 340);
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 }
 
-function cW(c) { return c.width / DPR; }
-function cH(c) { return c.height / DPR; }
+function cW() { return CANVAS_WIDTH; }
+function cH() { return CANVAS_HEIGHT; }
 
 let visitorNumber = 1;
-let submitted    = false;
-let drawingMode  = 'pen';
+let submitted = false;
 let currentColor = '#1a1a2e';
-let currentSize  = 2;
-let hasDrawn     = false;
+let currentSize = 2;
+let hasDrawn = false;
 
+// ───────────────── Firebase Load ─────────────────
 async function loadChain() {
   loadingMsg.textContent = "Retrieving the previous visitor's canvas…";
+
   try {
     const snap = await db.ref('chain').get();
+
     if (snap.exists()) {
       const data = snap.val();
       visitorNumber = (data.visitorCount || 0) + 1;
-      if (data.latestCanvas) renderPrevious(data.latestCanvas);
+
+      if (data.latestCanvas) {
+        renderPrevious(data.latestCanvas);
+      }
     }
+
     visitorNum.textContent = 'Visitor #' + visitorNumber;
     hideOverlay();
+
   } catch (err) {
-    console.error(err);
-    loadingMsg.textContent = 'Database error: ' + err.message + ' — Check Firebase Rules.';
-    setTimeout(hideOverlay, 5000);
+    console.error("Firebase error:", err);
+    loadingMsg.textContent = 'Database error: ' + err.message;
+    setTimeout(hideOverlay, 3000);
   }
 }
 
 function hideOverlay() {
   overlay.style.opacity = '0';
-  setTimeout(() => overlay.style.display = 'none', 500);
+  setTimeout(() => {
+    overlay.style.display = 'none';
+  }, 500);
 }
 
 function renderPrevious(dataURL) {
   prevEmpty.style.display = 'none';
+
   const img = new Image();
+
   img.onload = () => {
-    prevCtx.clearRect(0, 0, cW(prevCanvas), cH(prevCanvas));
-    prevCtx.drawImage(img, 0, 0, cW(prevCanvas), cH(prevCanvas));
+    prevCtx.clearRect(0, 0, cW(), cH());
+    prevCtx.drawImage(img, 0, 0, cW(), cH());
   };
+
   img.src = dataURL;
 }
 
@@ -358,129 +380,159 @@ async function saveChain(dataURL) {
   await db.ref('chain').set({
     visitorCount: visitorNumber,
     latestCanvas: dataURL,
-    updatedAt:    Date.now()
+    updatedAt: Date.now()
   });
 }
 
-// ── Drawing ───────────────────────────────────────────────────
-let isDrawing = false, lastX = 0, lastY = 0;
+// ───────────────── Drawing Logic ─────────────────
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
 
 function getPos(e, canvas) {
-  const rect  = canvas.getBoundingClientRect();
+  const rect = canvas.getBoundingClientRect();
   const touch = e.touches ? e.touches[0] : e;
-  return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+
+  return {
+    x: ((touch.clientX - rect.left) / rect.width) * CANVAS_WIDTH,
+    y: ((touch.clientY - rect.top) / rect.height) * CANVAS_HEIGHT
+  };
 }
 
-myCanvas.addEventListener('mousedown',  startDraw);
-myCanvas.addEventListener('mousemove',  draw);
-myCanvas.addEventListener('mouseup',    stopDraw);
-myCanvas.addEventListener('mouseleave', stopDraw);
-myCanvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e); }, { passive: false });
-myCanvas.addEventListener('touchmove',  e => { e.preventDefault(); draw(e); },      { passive: false });
-myCanvas.addEventListener('touchend',   stopDraw);
-
 function startDraw(e) {
-  if (submitted || drawingMode === 'text') return;
+  if (submitted) return;
+
   isDrawing = true;
+
   const { x, y } = getPos(e, myCanvas);
-  lastX = x; lastY = y;
+
+  lastX = x;
+  lastY = y;
+
   myCtx.beginPath();
   myCtx.arc(x, y, currentSize / 2, 0, Math.PI * 2);
   myCtx.fillStyle = currentColor;
   myCtx.fill();
+
   markDrawn();
 }
 
 function draw(e) {
-  if (!isDrawing || submitted || drawingMode === 'text') return;
+  if (!isDrawing || submitted) return;
+
   const { x, y } = getPos(e, myCanvas);
+
   myCtx.beginPath();
   myCtx.moveTo(lastX, lastY);
   myCtx.lineTo(x, y);
+
   myCtx.strokeStyle = currentColor;
-  myCtx.lineWidth   = currentSize;
-  myCtx.lineCap     = 'round';
-  myCtx.lineJoin    = 'round';
+  myCtx.lineWidth = currentSize;
+  myCtx.lineCap = 'round';
+  myCtx.lineJoin = 'round';
+
   myCtx.stroke();
-  lastX = x; lastY = y;
+
+  lastX = x;
+  lastY = y;
+
   markDrawn();
 }
 
-function stopDraw() { isDrawing = false; }
+function stopDraw() {
+  isDrawing = false;
+}
+
 function markDrawn() {
-  if (!hasDrawn) { hasDrawn = true; submitBtn.disabled = false; }
+  if (!hasDrawn) {
+    hasDrawn = true;
+    submitBtn.disabled = false;
+  }
 }
 
-myCanvas.addEventListener('click', e => {
-  if (drawingMode !== 'text' || submitted) return;
-  const { x, y } = getPos(e, myCanvas);
-  const text = prompt('Type something:');
-  if (!text) return;
-  myCtx.font      = `${Math.max(currentSize * 6, 16)}px 'DM Mono', monospace`;
-  myCtx.fillStyle = currentColor;
-  myCtx.fillText(text, x, y);
-  markDrawn();
-});
+// Mouse events
+myCanvas.addEventListener('mousedown', startDraw);
+myCanvas.addEventListener('mousemove', draw);
+myCanvas.addEventListener('mouseup', stopDraw);
+myCanvas.addEventListener('mouseleave', stopDraw);
 
-// ── Toolbar ───────────────────────────────────────────────────
-document.querySelectorAll('.color-swatch').forEach(s => {
-  s.addEventListener('click', () => {
-    document.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('active'));
-    s.classList.add('active');
-    currentColor = s.dataset.color;
+// Touch events
+myCanvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  startDraw(e);
+}, { passive: false });
+
+myCanvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  draw(e);
+}, { passive: false });
+
+myCanvas.addEventListener('touchend', stopDraw);
+
+// ───────────────── Toolbar ─────────────────
+document.querySelectorAll('.color-swatch').forEach((swatch) => {
+  swatch.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch')
+      .forEach(s => s.classList.remove('active'));
+
+    swatch.classList.add('active');
+    currentColor = swatch.dataset.color;
   });
 });
 
-document.querySelectorAll('.size-btn').forEach(btn => {
+document.querySelectorAll('.size-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.size-btn')
+      .forEach(b => b.classList.remove('active'));
+
     btn.classList.add('active');
     currentSize = parseInt(btn.dataset.size);
   });
 });
 
 document.getElementById('pen-btn').addEventListener('click', () => {
-  drawingMode = 'pen';
   myCanvas.style.cursor = 'crosshair';
-  document.getElementById('pen-btn').classList.add('active');
-  document.getElementById('text-btn').classList.remove('active');
-});
-
-document.getElementById('text-btn').addEventListener('click', () => {
-  drawingMode = 'text';
-  myCanvas.style.cursor = 'text';
-  document.getElementById('text-btn').classList.add('active');
-  document.getElementById('pen-btn').classList.remove('active');
 });
 
 document.getElementById('clear-btn').addEventListener('click', () => {
   if (submitted) return;
+
   myCtx.fillStyle = '#fffdf7';
-  myCtx.fillRect(0, 0, cW(myCanvas), cH(myCanvas));
+  myCtx.fillRect(0, 0, cW(), cH());
+
   hasDrawn = false;
   submitBtn.disabled = true;
 });
 
-// ── Submit ────────────────────────────────────────────────────
+// ───────────────── Submit ─────────────────
 submitBtn.addEventListener('click', async () => {
   if (submitted) return;
+
   submitted = true;
   submitBtn.disabled = true;
+
   document.getElementById('toolbar').style.pointerEvents = 'none';
   myCanvas.style.cursor = 'default';
+
   setStatus('saving', 'Passing your canvas to the chain…');
 
   try {
     const dataURL = myCanvas.toDataURL('image/png');
+
     await saveChain(dataURL);
+
     setStatus('saved', 'Saved ✓ — the next visitor will see your work.');
     showDoneMessage();
+
   } catch (err) {
     console.error(err);
+
     submitted = false;
     submitBtn.disabled = false;
+
     document.getElementById('toolbar').style.pointerEvents = '';
     myCanvas.style.cursor = 'crosshair';
+
     setStatus('error', 'Save failed: ' + err.message);
   }
 });
@@ -492,29 +544,21 @@ function setStatus(cls, msg) {
 
 function showDoneMessage() {
   const section = document.getElementById('my-section');
+
   const msg = document.createElement('div');
   msg.className = 'submitted-msg';
+
   msg.innerHTML = `
     <h3>Passed on.</h3>
     <p>Your canvas has been saved to the chain.<br>
     The next stranger who visits will see what you drew.<br>
     They'll add their own layer — and pass it forward.</p>
   `;
+
   section.appendChild(msg);
 }
 
-// ── Resize ────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  [myCanvas, prevCanvas].forEach(canvas => {
-    const snap = canvas.toDataURL();
-    initCanvas(canvas);
-    const img = new Image();
-    img.onload = () => canvas.getContext('2d').drawImage(img, 0, 0, cW(canvas), cH(canvas));
-    img.src = snap;
-  });
-});
-
-// ── Start ─────────────────────────────────────────────────────
+// ───────────────── Start ─────────────────
 initCanvas(prevCanvas);
 initCanvas(myCanvas);
 loadChain();
